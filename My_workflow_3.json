@@ -1,0 +1,359 @@
+{
+  "name": "My workflow 3",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-research-trigger",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        40
+      ],
+      "id": "24a863ed-d52e-41c2-b37d-b1aebe1fa95a",
+      "name": "Lead Research Webhook",
+      "webhookId": "lead-research-webhook-trigger"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1TfX2kyZBM6zzt4cnLVbjfCWzC671mgOLGkFeiSS2NI4",
+          "mode": "list",
+          "cachedResultName": "TEST SHEET N8N",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1TfX2kyZBM6zzt4cnLVbjfCWzC671mgOLGkFeiSS2NI4/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1TfX2kyZBM6zzt4cnLVbjfCWzC671mgOLGkFeiSS2NI4/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.5,
+      "position": [
+        660,
+        440
+      ],
+      "id": "ab95cfcf-d256-4574-b87a-c5c3de6c0842",
+      "name": "Google Sheets - Read Leads",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "3Z30DAAxJlLzJD1B",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "gama",
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAzureOpenAi",
+      "typeVersion": 1,
+      "position": [
+        400,
+        240
+      ],
+      "id": "865a7ebb-10be-46c2-bb64-054ed713ec14",
+      "name": "Azure OpenAI Chat Model",
+      "credentials": {
+        "azureOpenAiApi": {
+          "id": "wj3QZIb0FqbbWKMG",
+          "name": "Azure Open AI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolSerpApi",
+      "typeVersion": 1,
+      "position": [
+        460,
+        440
+      ],
+      "id": "b526ea3a-98dd-4cd6-8f6c-0349d430b7da",
+      "name": "SerpAPI Tool",
+      "credentials": {
+        "serpApi": {
+          "id": "BM0O7Y7NZtIcGL90",
+          "name": "SerpAPI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are a Lead Research Assistant AI. For each lead, use the serp api tool to:\n\n1. Search for the person's LinkedIn profile using their email, phone number, and company name.\n2. Extract their full name, current job title, skills, and professional experience.\n3. Use the company name and website to understand what the company does and their area of operation.\n4. Cross-check the lead's provided details (email, phone, company) with the data found from LinkedIn and the company website.\n5. Return a professional, clean, and enriched lead profile in the following structured JSON format:\n\n{\n  \"Name\": \"\",\n  \"Title\": \"\",\n  \"company_name\": \"{{ $node[\"Google Sheets - Read Leads\"].json[\"Company\"] }}\",\n  \"company_description\": \"\",\n  \"LinkedIn_Profile\": \"\",\n  \"Email\": \"{{ $node[\"Google Sheets - Read Leads\"].json[\"Email\"] }}\",\n  \"Phone_No_\": \"{{ $node[\"Google Sheets - Read Leads\"].json[\"Phone\"] }}\",\n  \"Verification\": \"Verified\" // or \"Mismatch\" if discrepancies found\n}\n\nInput Details:\n- Company Name: {{ $node[\"Google Sheets - Read Leads\"].json[\"Company\"] }}\n- Email: {{ $node[\"Google Sheets - Read Leads\"].json[\"Email\"] }}\n- Phone: {{ $node[\"Google Sheets - Read Leads\"].json[\"Phone\"] }}\n- Company Website: {{ $node[\"Google Sheets - Read Leads\"].json[\"Website\"] }}",
+        "options": {
+          "systemMessage": "You are a professional lead research assistant. Always return clear, concise, and accurate information. Use formal business language. Ensure the response is structured and helpful for business decision-making. When unsure, mention uncertainty clearly.",
+          "maxIterations": 5
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        600,
+        40
+      ],
+      "id": "12aba64a-0383-4056-b5a6-f62f8fb4e8d7",
+      "name": "AI Lead Research Agent"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Parse the AI's response into a structured object\nconst responseText = $input.item.json.response;\n\n// Try to extract JSON from the response\nlet extractedData;\ntry {\n  // Look for JSON pattern in the response\n  const jsonMatch = responseText.match(/\\{[\\s\\S]*\\}/g);\n  if (jsonMatch) {\n    extractedData = JSON.parse(jsonMatch[0]);\n  } else {\n    // Fallback if no JSON pattern found\n    extractedData = {\n      Name: \"Could not extract\",\n      Title: \"Could not extract\",\n      company_name: $input.item.json[\"Company\"],\n      company_description: \"Could not extract\",\n      LinkedIn_Profile: \"Could not extract\",\n      Email: $input.item.json[\"Email\"],\n      Phone_No_: $input.item.json[\"Phone\"],\n      Verification: \"Processing Error\"\n    };\n  }\n} catch (error) {\n  // Handle parsing errors\n  extractedData = {\n    Name: \"Parsing Error\",\n    Title: \"Parsing Error\",\n    company_name: $input.item.json[\"Company\"],\n    company_description: \"Error extracting data: \" + error.message,\n    LinkedIn_Profile: \"Parsing Error\",\n    Email: $input.item.json[\"Email\"],\n    Phone_No_: $input.item.json[\"Phone\"],\n    Verification: \"Processing Error\"\n  };\n}\n\nreturn {json: extractedData};"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        960,
+        60
+      ],
+      "id": "154d6d2c-f0ce-42ef-87d3-81227016ffa5",
+      "name": "Format Research Results"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1TfX2kyZBM6zzt4cnLVbjfCWzC671mgOLGkFeiSS2NI4",
+          "mode": "list",
+          "cachedResultName": "TEST SHEET N8N",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1TfX2kyZBM6zzt4cnLVbjfCWzC671mgOLGkFeiSS2NI4/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2034502250,
+          "mode": "list",
+          "cachedResultName": "Sheet2",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1TfX2kyZBM6zzt4cnLVbjfCWzC671mgOLGkFeiSS2NI4/edit#gid=2034502250"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $json.Name }}",
+            "Title": "={{ $json.Title }}",
+            "company_name": "={{ $json.company_name }}",
+            "company_description": "={{ $json.company_description }}",
+            "LinkedIn Profile": "={{ $json.LinkedIn_Profile }}",
+            "Email": "={{ $json.Email }}",
+            "Phone No.": "={{ $json.Phone_No_ }}",
+            "Verification": "={{ $json.Verification }}"
+          },
+          "matchingColumns": [
+            "Email"
+          ],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Title",
+              "displayName": "Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "company_name",
+              "displayName": "company_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "company_description",
+              "displayName": "company_description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "LinkedIn Profile",
+              "displayName": "LinkedIn Profile",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Phone No.",
+              "displayName": "Phone No.",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Verification",
+              "displayName": "Verification",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.5,
+      "position": [
+        800,
+        300
+      ],
+      "id": "fa45fd8e-9fbc-4b2c-8113-71e808d139bf",
+      "name": "Google Sheets - Update Results",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "3Z30DAAxJlLzJD1B",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        40
+      ],
+      "id": "47d00959-cc9e-476b-b453-910b07519323",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Azure OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Lead Research Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SerpAPI Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Lead Research Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Lead Research Agent": {
+      "main": [
+        [
+          {
+            "node": "Format Research Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Research Results": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Update Results": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Lead Research Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead Research Webhook": {
+      "main": [
+        [
+          {
+            "node": "AI Lead Research Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Read Leads": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Lead Research Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "83851309-596e-439c-9bb9-a11044cd05bc",
+  "meta": {
+    "instanceId": "6d1700df594fc3320db78133f9394d601cfc6ec236006535085eead19fd9c07d"
+  },
+  "id": "YVYjkANHQkGd8tnL",
+  "tags": []
+}
