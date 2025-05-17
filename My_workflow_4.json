@@ -1,0 +1,250 @@
+{
+  "name": "My workflow 4",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "excel-process",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        0,
+        80
+      ],
+      "id": "69b316c3-39a7-462b-93b3-232635074903",
+      "name": "Excel Upload Webhook",
+      "webhookId": "excel-process-webhook"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 1,
+      "position": [
+        220,
+        80
+      ],
+      "id": "6423f668-fe18-4322-93e6-4e3c11bdb2c2",
+      "name": "Read Excel File"
+    },
+    {
+      "parameters": {
+        "model": "gama",
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAzureOpenAi",
+      "typeVersion": 1,
+      "position": [
+        400,
+        280
+      ],
+      "id": "8093c20c-7fe0-4c91-a97c-797a13b18ce4",
+      "name": "Azure OpenAI Chat Model",
+      "credentials": {
+        "azureOpenAiApi": {
+          "id": "wj3QZIb0FqbbWKMG",
+          "name": "Azure Open AI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are an Excel Data Processing Assistant. For each row in the Excel file:\n\n1. Analyze the data in each column\n2. Apply necessary data cleaning and formatting\n3. Perform data validation\n4. Generate insights about the data\n5. Return the processed data in a structured format\n\nEnsure that all processed data maintains consistency and follows best practices for data handling.",
+        "options": {
+          "systemMessage": "You are a professional data processing assistant. Always return clear, structured, and validated data. Ensure data quality and consistency in all operations.",
+          "maxIterations": 5
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        600,
+        80
+      ],
+      "id": "1da9ecca-aa9a-46f8-b4f2-1d45cb438ee8",
+      "name": "AI Data Processing Agent"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Format the AI's processed data for Excel\nconst processedData = $input.item.json.response;\n\n// Try to extract structured data\nlet formattedData;\ntry {\n  if (typeof processedData === 'string') {\n    formattedData = JSON.parse(processedData);\n  } else {\n    formattedData = processedData;\n  }\n  \n  // Ensure the data is in array format\n  if (!Array.isArray(formattedData)) {\n    formattedData = [formattedData];\n  }\n  \n  return formattedData;\n} catch (error) {\n  throw new Error('Failed to format data: ' + error.message);\n}"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        900,
+        260
+      ],
+      "id": "7d97e9ed-04ec-4e21-8b0e-b4a6a71b4452",
+      "name": "Format Processed Data"
+    },
+    {
+      "parameters": {
+        "operation": "toFile",
+        "fileFormat": "xlsx",
+        "options": {
+          "compression": false,
+          "headerRow": true
+        }
+      },
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 1,
+      "position": [
+        1060,
+        40
+      ],
+      "id": "0ab3ba75-50f2-4740-86b2-02f9cfec5048",
+      "name": "Create Excel File"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1120,
+        320
+      ],
+      "id": "5c0c3b07-4e38-4bfe-b159-e33dec50d027",
+      "name": "Google Sheets - Store Results",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "3Z30DAAxJlLzJD1B",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              },
+              {
+                "name": "Content-Disposition",
+                "value": "attachment; filename=processed_data.xlsx"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        60
+      ],
+      "id": "ef8aad29-7434-456c-8617-f8af7ba8e452",
+      "name": "Download Response"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Excel Upload Webhook": {
+      "main": [
+        [
+          {
+            "node": "Read Excel File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Excel File": {
+      "main": [
+        [
+          {
+            "node": "AI Data Processing Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Azure OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Data Processing Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Data Processing Agent": {
+      "main": [
+        [
+          {
+            "node": "Format Processed Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Processed Data": {
+      "main": [
+        [
+          {
+            "node": "Create Excel File",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Sheets - Store Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Excel File": {
+      "main": [
+        [
+          {
+            "node": "Download Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "daa3a244-a8d3-4310-a840-50f61f5640a9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6d1700df594fc3320db78133f9394d601cfc6ec236006535085eead19fd9c07d"
+  },
+  "id": "r93NSNIVNxWcskR5",
+  "tags": []
+}
